@@ -14,12 +14,12 @@ function App() {
       container: mapContainerRef.current,
       style:
         'https://api.maptiler.com/maps/019f3360-f517-7c04-a558-fa1c2ec026bd/style.json?key=uSbxwm6B5wLPbHFgbnVz',
-      center: [32.8597, 39.9334], // [lng, lat]
-      zoom: 16,
+      center: [32.859537, 39.904965], // [lng, lat]
+      zoom: 15.8,
       minZoom: 10,
       maxZoom: 18,
       pitch: 35,
-      bearing: -20,
+      bearing: 50,
       antialias: true
     });
 
@@ -51,22 +51,32 @@ function App() {
         },
         labelLayer
       );
+       
+      mapRef.current.setLight({
+        anchor: 'viewport',
+        color: '#e94444ff',
+        intensity: 0.7,
+        position: [5, 210, 15]
+      });
     });
 
     return () => {
       mapRef.current?.remove();
     };
   }, []);
+return (
+  <div className="app">
 
-  return (
     <div
       ref={mapContainerRef}
-      style={{
-        width: '100vw',
-        height: '100vh'
-      }}
+      className="map"
     />
-  );
+
+    <div className="spotlight"></div>
+
+  </div>
+);
+  
 }
 
 export default App;
