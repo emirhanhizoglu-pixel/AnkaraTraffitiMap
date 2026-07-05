@@ -1,4 +1,4 @@
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
 
@@ -22,6 +22,11 @@ function App() {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
+      <Marker position={[39.9042, 32.7645]}> // Hardcoded location in Ankara
+        <Popup>
+          This is a placeholder popup text for the marker.
+        </Popup>
+      </Marker>
     </MapContainer>
   );
 }
