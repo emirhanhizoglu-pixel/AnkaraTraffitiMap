@@ -1,41 +1,80 @@
 import BuildingProvider from "../Data/BuildingProvider";
 import BuildingGeometry from "../Geometry/BuildingGeometry";
-import BuildingMesh from "../Meshes/BuildingMesh";
+import BuildingMesh from "../Meshes/Building";
+import SceneOrigin from "./SceneOrigin";
 
 export default class SceneBuilder {
 
     constructor(map) {
-
         this.map = map;
-
     }
 
     build(renderer) {
 
-        const provider = new BuildingProvider(this.map);
+        const center = this.map.getCenter();
 
+        const sceneOrigin = new SceneOrigin(
+            center.lng,
+            center.lat
+        );
+
+        renderer.sceneOrigin = sceneOrigin;
+
+        const provider = new BuildingProvider(this.map);
         const buildings = provider.getBuildings();
 
-        console.log("BUILDING COUNT:", buildings.length);
+        console.log("Total buildings:", buildings.length);
 
-        if (buildings.length === 0) {
-            return;
-        }
+        buildings.forEach(feature => {
 
-        const feature = buildings[0];
+            let rings = [];
 
-        const ring = BuildingGeometry.getOuterRing(feature);
+            if (feature.geometry.type === "Polygon") {
 
-        const mercator = BuildingGeometry.toMercator(ring);
+                rings.push(feature.geometry.coordinates[0]);
 
-        const shape = BuildingGeometry.toShape(mercator);
+            } else if (feature.geometry.type === "MultiPolygon") {
 
-        const mesh = BuildingMesh.create(shape);
+                feature.geometry.coordinates.forEach(polygon => {
+                    rings.push(polygon[0]);
+                });
 
-        renderer.add(mesh);
+            } else {
 
-        console.log("Scene:", renderer.scene);
-        console.log("Children:", renderer.scene.children.length);
+                return;
+
+            }
+
+            const height =
+                Number(feature.properties.render_height) || 5;
+
+            rings.forEach(ring => {
+
+                const points = ring.map(([lng, lat]) => ({
+                    lng,
+                    lat
+                }));
+
+                const building = BuildingGeometry.create(
+                    points,
+                    sceneOrigin
+                );
+
+                const mesh = BuildingMesh.create(
+                    building.shape,
+                    sceneOrigin.scale,
+                    height
+                );
+
+                // Geometry is already expressed relative to the scene origin.
+                // The mesh itself stays at the scene origin.
+                mesh.position.set(0, 0, 0);
+
+                renderer.add(mesh);
+
+            });
+
+        });
 
     }
 

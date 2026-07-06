@@ -3,62 +3,58 @@ import * as THREE from "three";
 
 export default class BuildingGeometry {
 
-    static getOuterRing(feature) {
+    static create(points, sceneOrigin) {
 
-        if (!feature) {
-            return [];
-        }
-
-        if (feature.geometry.type !== "MultiPolygon") {
-            return [];
-        }
-
-        const ring = feature.geometry.coordinates[0][0];
-
-        return ring.map(point => ({
-            lng: point[0],
-            lat: point[1]
-        }));
-
-    }
-
-    static toMercator(points) {
-
-        return points.map(point => {
-
-            const mercator = maplibregl.MercatorCoordinate.fromLngLat({
+        const mercatorPoints = points.map(point =>
+            maplibregl.MercatorCoordinate.fromLngLat({
                 lng: point.lng,
                 lat: point.lat
-            });
-
-            return {
-                x: mercator.x,
-                y: mercator.y
-            };
-
-        });
-
-    }
-
-    static toShape(points) {
+            })
+        );
 
         const shape = new THREE.Shape();
 
-        points.forEach((point, index) => {
+        mercatorPoints.forEach((p, i) => {
 
-            if (index === 0) {
+            const x =
+                (p.x - sceneOrigin.coordinate.x) / sceneOrigin.scale;
 
-                shape.moveTo(point.x, point.y);
+            const y =
+                (sceneOrigin.coordinate.y - p.y) / sceneOrigin.scale;
+
+            if (i === 0) {
+
+                shape.moveTo(x, y);
 
             } else {
 
-                shape.lineTo(point.x, point.y);
+                shape.lineTo(x, y);
 
             }
 
         });
 
-        return shape;
+        const first = mercatorPoints[0];
+
+        return {
+
+            shape,
+
+            position: {
+
+                x:
+                    (first.x - sceneOrigin.coordinate.x) /
+                    sceneOrigin.scale,
+
+                y:
+                    (sceneOrigin.coordinate.y - first.y) /
+                    sceneOrigin.scale,
+
+                z: 0
+
+            }
+
+        };
 
     }
 
