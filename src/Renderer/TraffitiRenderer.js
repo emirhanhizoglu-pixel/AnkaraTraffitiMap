@@ -23,4 +23,16 @@ export default class TraffitiRenderer {
 
     }
 
+    onAdd(map, gl) {
+
+        console.log("TraffitiRenderer added");
+
+    }
+
+    render(gl, matrix) {
+
+        console.log("render()");
+
+    }
+
 }

@@ -2,14 +2,12 @@ import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 
 import TraffitiRenderer from '../Renderer/TraffitiRenderer';
-import BuildingProvider from '../Data/BuildingProvider';
-import BuildingGeometry from '../Geometry/BuildingGeometry';
-import BuildingMesh from '../Meshes/BuildingMesh';
+import SceneBuilder from '../Scene/SceneBuilder';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import '../App.css';
 
-console.log("========== MAPSCENE VERSION 4 ==========");
+console.log("========== MAPSCENE VERSION 6 ==========");
 
 function MapScene() {
 
@@ -34,44 +32,44 @@ function MapScene() {
 
         const renderer = new TraffitiRenderer(mapRef.current);
 
-        console.log(renderer);
+        const sceneBuilder = new SceneBuilder(mapRef.current);
 
-        mapRef.current.on('idle', () => {
+        mapRef.current.on("load", () => {
+
+            mapRef.current.addLayer({
+
+                id: "traffiti-renderer",
+
+                type: "custom",
+
+                renderingMode: "3d",
+
+                onAdd: renderer.onAdd.bind(renderer),
+
+                render: renderer.render.bind(renderer)
+
+            });
+
+        });
+
+        mapRef.current.on("idle", () => {
 
             console.log("MAP IS IDLE");
 
-            const provider = new BuildingProvider(mapRef.current);
-
-            const buildings = provider.getBuildings();
-
-            console.log("BUILDING COUNT:", buildings.length);
-
-            if (buildings.length === 0) return;
-
-            const feature = buildings[0];
-
-            const ring = BuildingGeometry.getOuterRing(feature);
-
-            const mercator = BuildingGeometry.toMercator(ring);
-
-            const shape = BuildingGeometry.toShape(mercator);
-
-            const mesh = BuildingMesh.create(shape);
-
-            renderer.add(mesh);
-
-            console.log("Scene:", renderer.scene);
-            console.log("Children:", renderer.scene.children.length);
+            sceneBuilder.build(renderer);
 
         });
 
         return () => {
+
             mapRef.current?.remove();
+
         };
 
     }, []);
 
     return (
+
         <div className="app">
 
             <div
@@ -82,6 +80,7 @@ function MapScene() {
             <div className="spotlight"></div>
 
         </div>
+
     );
 
 }
