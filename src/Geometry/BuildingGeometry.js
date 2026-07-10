@@ -14,13 +14,21 @@ export default class BuildingGeometry {
 
         const shape = new THREE.Shape();
 
+        let sumX = 0;
+        let sumY = 0;
+
         mercatorPoints.forEach((p, i) => {
 
             const x =
-                (p.x - sceneOrigin.coordinate.x) / sceneOrigin.scale;
+                (p.x - sceneOrigin.coordinate.x) /
+                sceneOrigin.scale;
 
             const y =
-                (sceneOrigin.coordinate.y - p.y) / sceneOrigin.scale;
+                (sceneOrigin.coordinate.y - p.y) /
+                sceneOrigin.scale;
+
+            sumX += x;
+            sumY += y;
 
             if (i === 0) {
 
@@ -34,22 +42,22 @@ export default class BuildingGeometry {
 
         });
 
-        const first = mercatorPoints[0];
+        const centerX = sumX / mercatorPoints.length;
+        const centerY = sumY / mercatorPoints.length;
 
         return {
 
             shape,
 
+            center: new THREE.Vector2(
+                centerX,
+                centerY
+            ),
+
             position: {
 
-                x:
-                    (first.x - sceneOrigin.coordinate.x) /
-                    sceneOrigin.scale,
-
-                y:
-                    (sceneOrigin.coordinate.y - first.y) /
-                    sceneOrigin.scale,
-
+                x: 0,
+                y: 0,
                 z: 0
 
             }

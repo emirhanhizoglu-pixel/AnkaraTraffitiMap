@@ -1,18 +1,23 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 
 import TraffitiRenderer from "../Renderer/TraffitiRenderer";
 import SceneBuilder from "../Scene/SceneBuilder";
+import GraffitiProvider from "../Data/GraffitiProvider";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import "../App.css";
 
-console.log("========== MAPSCENE VERSION 10 ==========");
+console.log("========== MAPSCENE VERSION 15 ==========");
+
+const BUILDING_THRESHOLD = 87;
 
 function MapScene() {
 
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
+
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
 
@@ -46,7 +51,9 @@ function MapScene() {
 
             console.log("MAP LOADED");
 
-            // Print all style layer IDs once.
+            console.log("Sources:");
+            console.log(mapRef.current.getStyle().sources);
+
             console.table(
                 mapRef.current
                     .getStyle()
@@ -59,6 +66,38 @@ function MapScene() {
                     }))
             );
 
+            
+            // ==========================================
+            // Wait for enough building features
+            // ==========================================
+
+            const interval = setInterval(() => {
+
+                const count = mapRef.current.querySourceFeatures(
+                    "maptiler_planet",
+                    {
+                        sourceLayer: "building"
+                    }
+                ).length;
+
+                console.log("Available building features:", count);
+
+                if (count >= BUILDING_THRESHOLD) {
+
+                    console.log("Neighborhood ready.");
+
+                    clearInterval(interval);
+
+                    setLoading(false);
+
+                }
+
+            }, 1000);
+
+            // ==========================================
+            // Build Scene
+            // ==========================================
+
             const sceneBuilder = new SceneBuilder(mapRef.current);
 
             sceneBuilder.build(renderer);
@@ -67,6 +106,37 @@ function MapScene() {
             console.log("Children:", renderer.scene.children.length);
 
             mapRef.current.addLayer(renderer);
+
+            // ==========================================
+            // Graffiti Markers
+            // ==========================================
+
+            const graffitiProvider = new GraffitiProvider();
+
+            graffitiProvider.getGraffiti().forEach(graffiti => {
+
+                new maplibregl.Marker()
+
+                    .setLngLat([
+                        graffiti.lng,
+                        graffiti.lat
+                    ])
+
+                    .setPopup(
+                        new maplibregl.Popup({
+                            offset: 25
+                        }).setText(graffiti.title)
+                    )
+
+                    .addTo(mapRef.current);
+
+            });
+
+            mapRef.current.on("remove", () => {
+
+                clearInterval(interval);
+
+            });
 
         });
 
@@ -81,6 +151,18 @@ function MapScene() {
     return (
 
         <div className="app">
+
+            {loading && (
+
+                <div className="loading-screen">
+
+                    <h1>TRAFFITI</h1>
+
+                    <p>Initializing world...</p>
+
+                </div>
+
+            )}
 
             <div
                 ref={mapContainerRef}

@@ -28,4 +28,25 @@ export default class SceneOrigin {
 
     }
 
+    toLocal(lng, lat, altitude = 0) {
+
+        const mercator =
+            maplibregl.MercatorCoordinate.fromLngLat(
+                { lng, lat },
+                altitude
+            );
+
+        const meterScale =
+            this.mercator.meterInMercatorCoordinateUnits();
+
+        return {
+
+            x: (mercator.x - this.mercator.x) / meterScale,
+
+            y: (this.mercator.y - mercator.y) / meterScale
+
+        };
+
+    }
+
 }
