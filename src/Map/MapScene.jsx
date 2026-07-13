@@ -1,16 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 
+import graffitiMarker from "../assets/traffiti_marker.png";
+
 import TraffitiRenderer from "../Renderer/TraffitiRenderer";
 import SceneBuilder from "../Scene/SceneBuilder";
 import GraffitiProvider from "../Data/GraffitiProvider";
+import GraffitiDetail from "../Graffiti/GraffitiDetail";
+import LoadingScreen from "../Loading/LoadingScreen";
 
 import "maplibre-gl/dist/maplibre-gl.css";
 import "../App.css";
 
-console.log("========== MAPSCENE VERSION 15 ==========");
+console.log("========== MAPSCENE VERSION 20 ==========");
 
-const BUILDING_THRESHOLD = 87;
+const HOME = [32.859537, 39.904965];
+const MAX_DISTANCE = 0.0045;
+const MIN_ZOOM = 15.2;
+const INITIAL_ZOOM = 14.7;
+const HOME_ZOOM = 15.8;
+const MARKER_ZOOM = 17.2;
+const MAP_REVEAL_DURATION = 2200;
 
 function MapScene() {
 
@@ -18,24 +28,28 @@ function MapScene() {
     const mapRef = useRef(null);
 
     const [loading, setLoading] = useState(true);
+    const [mapReady, setMapReady] = useState(false);
+    const [mapRevealActive, setMapRevealActive] = useState(true);
+    const [mapRevealing, setMapRevealing] = useState(false);
+    const [selectedGraffiti, setSelectedGraffiti] = useState(null);
 
     useEffect(() => {
 
         if (!mapContainerRef.current) return;
 
-        mapRef.current = new maplibregl.Map({
+        const map = new maplibregl.Map({
 
             container: mapContainerRef.current,
 
             style: "https://api.maptiler.com/maps/019f3360-f517-7c04-a558-fa1c2ec026bd/style.json?key=uSbxwm6B5wLPbHFgbnVz",
 
-            center: [32.859537, 39.904965],
+            center: HOME,
 
-            zoom: 15.8,
+            zoom: INITIAL_ZOOM,
 
-            minZoom: 10,
+            minZoom: INITIAL_ZOOM,
 
-            maxZoom: 18,
+            maxZoom: 17.8,
 
             pitch: 35,
 
@@ -45,96 +59,119 @@ function MapScene() {
 
         });
 
-        const renderer = new TraffitiRenderer(mapRef.current);
+        mapRef.current = map;
 
-        mapRef.current.on("load", () => {
+        // ==========================================
+        // Soft Camera Constraint
+        // ==========================================
+
+        map.on("dragend", () => {
+
+            const center = map.getCenter();
+
+            if (
+
+                Math.abs(center.lng - HOME[0]) > MAX_DISTANCE ||
+
+                Math.abs(center.lat - HOME[1]) > MAX_DISTANCE
+
+            ) {
+
+                map.easeTo({
+
+                    center: HOME,
+
+                    duration: 1800,
+
+                    easing: t => 1 - Math.pow(1 - t, 3)
+
+                });
+
+            }
+
+        });
+
+        const renderer = new TraffitiRenderer(map);
+
+        map.on("load", () => {
 
             console.log("MAP LOADED");
 
-            console.log("Sources:");
-            console.log(mapRef.current.getStyle().sources);
+            requestAnimationFrame(() => {
 
-            console.table(
-                mapRef.current
-                    .getStyle()
-                    .layers
-                    .map(layer => ({
-                        id: layer.id,
-                        type: layer.type,
-                        source: layer.source,
-                        sourceLayer: layer["source-layer"]
-                    }))
-            );
+                // ==========================================
+                // Build custom building scene
+                // ==========================================
 
-            
-            // ==========================================
-            // Wait for enough building features
-            // ==========================================
+                const sceneBuilder = new SceneBuilder(
+                    map
+                );
 
-            const interval = setInterval(() => {
+                sceneBuilder.build(renderer);
 
-                const count = mapRef.current.querySourceFeatures(
-                    "maptiler_planet",
-                    {
-                        sourceLayer: "building"
-                    }
-                ).length;
+                console.log(
+                    "Buildings:",
+                    renderer.buildings.length
+                );
 
-                console.log("Available building features:", count);
+                map.addLayer(renderer);
 
-                if (count >= BUILDING_THRESHOLD) {
+                // ==========================================
+                // Graffiti Markers
+                // ==========================================
 
-                    console.log("Neighborhood ready.");
+                const graffitiProvider =
+                    new GraffitiProvider();
 
-                    clearInterval(interval);
+                graffitiProvider
+                    .getGraffiti()
+                    .forEach(graffiti => {
 
-                    setLoading(false);
+                        const element =
+                            document.createElement("img");
 
-                }
+                        element.src = graffitiMarker;
+                        element.className =
+                            "graffiti-marker";
 
-            }, 1000);
+                        element.addEventListener("click", () => {
 
-            // ==========================================
-            // Build Scene
-            // ==========================================
+                            map.easeTo({
 
-            const sceneBuilder = new SceneBuilder(mapRef.current);
+                                center: [graffiti.lng, graffiti.lat],
+                                zoom: MARKER_ZOOM,
+                                duration: 1600,
+                                easing: t => 1 - Math.pow(1 - t, 3)
 
-            sceneBuilder.build(renderer);
+                            });
 
-            console.log("Scene:", renderer.scene);
-            console.log("Children:", renderer.scene.children.length);
+                            setSelectedGraffiti(graffiti);
 
-            mapRef.current.addLayer(renderer);
+                        });
 
-            // ==========================================
-            // Graffiti Markers
-            // ==========================================
+                        new maplibregl.Marker({
 
-            const graffitiProvider = new GraffitiProvider();
+                            element,
+                            anchor: "bottom"
 
-            graffitiProvider.getGraffiti().forEach(graffiti => {
+                        })
 
-                new maplibregl.Marker()
+                            .setLngLat([
+                                graffiti.lng,
+                                graffiti.lat
+                            ])
 
-                    .setLngLat([
-                        graffiti.lng,
-                        graffiti.lat
-                    ])
+                            .addTo(map);
 
-                    .setPopup(
-                        new maplibregl.Popup({
-                            offset: 25
-                        }).setText(graffiti.title)
-                    )
+                    });
 
-                    .addTo(mapRef.current);
+                // The visual loader may exit only after MapLibre has no
+                // pending tile or style work for the initial scene.
+                map.once("idle", () => {
 
-            });
+                    setMapReady(true);
 
-            mapRef.current.on("remove", () => {
-
-                clearInterval(interval);
+                });
 
             });
 
@@ -142,26 +179,57 @@ function MapScene() {
 
         return () => {
 
-            mapRef.current?.remove();
+            map.remove();
 
         };
 
     }, []);
+
+    const revealMap = () => {
+
+        setLoading(false);
+
+        requestAnimationFrame(() => {
+
+            setMapRevealing(true);
+
+            mapRef.current?.easeTo({
+
+                center: HOME,
+                zoom: HOME_ZOOM,
+                duration: MAP_REVEAL_DURATION,
+                easing: t => 1 - Math.pow(1 - t, 3)
+
+            });
+
+        });
+
+    };
+
+    const closeGraffitiDetail = () => {
+
+        setSelectedGraffiti(null);
+
+        mapRef.current?.easeTo({
+
+            center: HOME,
+            zoom: HOME_ZOOM,
+            duration: 1600,
+            easing: t => 1 - Math.pow(1 - t, 3)
+
+        });
+
+    };
 
     return (
 
         <div className="app">
 
             {loading && (
-
-                <div className="loading-screen">
-
-                    <h1>TRAFFITI</h1>
-
-                    <p>Initializing world...</p>
-
-                </div>
-
+                <LoadingScreen
+                    mapReady={mapReady}
+                    onComplete={revealMap}
+                />
             )}
 
             <div
@@ -169,7 +237,32 @@ function MapScene() {
                 className="map"
             />
 
+            {mapRevealActive && (
+                <div
+                    className={
+                        `map-reveal${
+                            mapRevealing
+                                ? " map-reveal--revealing"
+                                : ""
+                        }`
+                    }
+                    onTransitionEnd={() => {
+
+                        mapRef.current?.setMinZoom(MIN_ZOOM);
+                        setMapRevealActive(false);
+
+                    }}
+                />
+            )}
+
             <div className="spotlight"></div>
+
+            {selectedGraffiti && (
+                <GraffitiDetail
+                    graffiti={selectedGraffiti}
+                    onClose={closeGraffitiDetail}
+                />
+            )}
 
         </div>
 
